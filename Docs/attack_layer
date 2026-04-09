@@ -1,1 +1,100 @@
+# Attack Layer — Person 1
+### EC2 (Attacker VM) + RDS (MySQL Database)
 
+---
+
+## What This Layer Does
+
+Person 1 is responsible for **setting up the target environment and simulating realistic SQL injection attacks**. This layer creates both the attacker machine and the vulnerable application that is being attacked — intentionally insecure so the rest of the team can demonstrate detection and response.
+
+---
+
+## AWS Services Used
+
+### AWS EC2 (Elastic Compute Cloud)
+EC2 is AWS's virtual machine service. Two EC2 instances are used in this layer:
+
+| Instance | OS | Purpose |
+|----------|----|---------|
+| Attacker VM | Ubuntu | Runs SQLMap and custom Python scripts to fire SQL injection payloads |
+| Web App Host | Ubuntu | Hosts the vulnerable Flask/DVWA web application that is the attack target |
+
+**Why EC2 instead of a local machine?**
+Using EC2 allows traffic to be routed through WAF and API Gateway (Person 2), which is not possible with a local VM. It also simulates a realistic cloud-based threat scenario.
+
+### AWS RDS (Relational Database Service)
+RDS is a managed MySQL database service. AWS handles backups, patching, and availability.
+
+- **Target database:** An RDS MySQL instance acts as the backend for the vulnerable web app.
+- **Fake PII data:** The database contains a `users` table with fake names, emails, SSNs, and credit card numbers to simulate a real data leak.
+- **Evidence collection:** RDS query logs capture all executed SQL — including injected queries — for forensic analysis.
+
+---
+
+## Attack Types Simulated
+
+| Attack Type | Example Payload | Goal |
+|-------------|----------------|------|
+| Union-based | `' UNION SELECT username, password FROM users--` | Extract data directly |
+| Boolean blind | `' OR 1=1--` | Infer data one bit at a time |
+| Error-based | `' AND extractvalue(1, concat(0x7e, version()))--` | Trigger DB errors that leak info |
+| Time-delay blind | `'; WAITFOR DELAY '0:0:5'--` | Confirm injection via response delay |
+
+**Tool used:** SQLMap — an open-source automated SQL injection tool.
+
+---
+
+## Step-by-Step Setup
+
+1. Launch **two EC2 instances** (Ubuntu):
+   - One as the attacker VM
+   - One as the web app host
+
+2. Provision an **RDS MySQL instance**:
+   - Create a `users` table with fake PII (names, emails, SSNs, credit cards)
+   - Connect it to the web app EC2
+
+3. Deploy the **vulnerable web app** on the web app EC2:
+   - Use raw SQL queries — **no prepared statements** (intentionally insecure)
+   - Flask example: `query = "SELECT * FROM users WHERE id = " + user_input`
+
+4. Install **SQLMap** on the attacker EC2:
+   ```bash
+   sudo apt update && sudo apt install sqlmap -y
+   ```
+
+5. Run attacks:
+   ```bash
+   # Basic union-based attack
+   sqlmap -u "http://<web-app-ip>/user?id=1" --dbs
+
+   # Dump the users table
+   sqlmap -u "http://<web-app-ip>/user?id=1" -D mydb -T users --dump
+   ```
+
+6. Document each attack: payload used, HTTP request/response, data leaked, and screenshots.
+
+---
+
+## Report Section Ownership
+
+| Section | Title |
+|---------|-------|
+| Section 2 | Background: SQL Injection & Cloud Security (OWASP Top 10) |
+| Section 4 | Implementation: Threat Model & Attack Simulation |
+
+Use the **STRIDE framework** for the threat model:
+- **S**poofing, **T**ampering, **R**epudiation, **I**nformation Disclosure, **D**enial of Service, **E**levation of Privilege
+
+---
+
+## Key Outputs / Deliverables
+
+- [ ] Two EC2 instances running and accessible
+- [ ] RDS MySQL populated with fake PII
+- [ ] Vulnerable Flask app deployed and reachable through API Gateway
+- [ ] SQLMap attack logs (union-based, blind, error-based)
+- [ ] Screenshots of successful data exfiltration
+- [ ] Threat model written using STRIDE
+
+---
