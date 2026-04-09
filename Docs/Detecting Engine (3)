@@ -1,0 +1,181 @@
+# Detection Engine — Person 3
+### AWS Lambda + Amazon GuardDuty
+
+---
+
+## What This Layer Does
+
+Person 3 is responsible for **building the real-time detection engine** that reads incoming WAF logs, identifies SQL injection patterns, classifies their severity, and triggers alerts. This is the intelligence core of the project — it decides whether an attack is happening and how serious it is.
+
+---
+
+## AWS Services Used
+
+### AWS Lambda
+Lambda is a serverless compute service — you write a Python function and AWS runs it automatically in response to events, with no server management required.
+
+**How it is used:**
+- A **Python Lambda function** subscribes to the Kinesis stream (Person 4) and processes every WAF log entry in real time (within 1–2 seconds of the request)
+- Applies **regular expressions** to detect SQL injection signatures
+- **Classifies severity** of each detection
+- On HIGH or CRITICAL findings, **publishes a JSON alert** to the SNS topic (Person 5)
+- Writes each detection to **DynamoDB** for the live dashboard (Person 5)
+
+### Amazon GuardDuty
+GuardDuty is a managed threat detection service that uses machine learning and threat intelligence to monitor your AWS account automatically.
+
+**How it is used:**
+- Analyses **CloudTrail logs, VPC Flow Logs, and DNS logs** without any manual configuration
+- Detects **infrastructure-level anomalies** — e.g., an EC2 instance making unusually high numbers of database connections, or traffic from known malicious IP ranges
+- Cross-references traffic against AWS's **threat intelligence database** of known attacker IPs
+- Sends findings to **Security Hub** (Person 5) for centralised reporting
+
+---
+
+## SQLi Detection Patterns
+
+| Pattern | Regex | Severity |
+|---------|-------|----------|
+| Single quote / comment | `'`, `--`, `#` | LOW |
+| Boolean logic | `OR\s+1=1`, `AND\s+1=1` | MEDIUM |
+| UNION SELECT | `UNION\s+SELECT` | HIGH |
+| Time-delay attack | `SLEEP\(`, `WAITFOR\s+DELAY` | HIGH |
+| System table access | `information_schema`, `sysobjects` | HIGH |
+| Data exfiltration confirmed | Large result set from `users` table | CRITICAL |
+
+---
+
+## Severity Classification
+
+| Level | Meaning | Action |
+|-------|---------|--------|
+| LOW | Single suspicious character (e.g. lone quote) | Log only |
+| MEDIUM | Basic injection pattern (e.g. `OR 1=1`) | Log + CloudWatch metric |
+| HIGH | Successful UNION-based injection detected | Log + SNS alert |
+| CRITICAL | Data exfiltration confirmed | Log + SNS alert + DynamoDB |
+
+---
+
+## Lambda Function — How It Works
+
+```
+Kinesis Stream (WAF logs)
+        │
+        ▼
+  Lambda triggered
+        │
+        ▼
+  Parse log entry
+  (source IP, URI, query string, user-agent)
+        │
+        ▼
+  Apply regex patterns
+        │
+    ┌───┴───┐
+  Match?   No match → log as CLEAN, exit
+    │
+    ▼
+  Classify severity
+  (LOW / MEDIUM / HIGH / CRITICAL)
+        │
+        ▼
+  HIGH or CRITICAL?
+    ├── Yes → Publish to SNS topic
+    │         Write to DynamoDB
+    └── No  → Write to CloudWatch metric only
+```
+
+---
+
+## Step-by-Step Setup
+
+1. **Enable Amazon GuardDuty:**
+   - AWS Console → GuardDuty → Enable
+   - No further configuration needed — it starts analysing logs automatically
+
+2. **Write the Lambda detection function (Python):**
+   ```python
+   import re, json, boto3
+
+   SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:ACCOUNT_ID:sql-injection-alerts"
+   PATTERNS = {
+       "CRITICAL": [r"UNION\s+SELECT.*FROM\s+users"],
+       "HIGH":     [r"UNION\s+SELECT", r"SLEEP\(", r"WAITFOR\s+DELAY", r"information_schema"],
+       "MEDIUM":   [r"\bOR\b.+1\s*=\s*1", r"\bAND\b.+1\s*=\s*1"],
+       "LOW":      [r"'", r"--", r"#"],
+   }
+
+   def classify(payload):
+       for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+           for pattern in PATTERNS[severity]:
+               if re.search(pattern, payload, re.IGNORECASE):
+                   return severity
+       return "CLEAN"
+
+   def lambda_handler(event, context):
+       sns = boto3.client("sns")
+       for record in event["Records"]:
+           log = json.loads(record["kinesis"]["data"])
+           uri = log.get("httpRequest", {}).get("uri", "")
+           args = log.get("httpRequest", {}).get("args", "")
+           payload = uri + " " + args
+           severity = classify(payload)
+           if severity in ("HIGH", "CRITICAL"):
+               sns.publish(
+                   TopicArn=SNS_TOPIC_ARN,
+                   Subject=f"[{severity}] SQL Injection Detected",
+                   Message=json.dumps({"severity": severity, "payload": payload, "log": log})
+               )
+   ```
+
+3. **Deploy Lambda:**
+   - Create function in AWS Console (Python 3.12 runtime)
+   - Add Kinesis stream as event source trigger
+   - Set IAM role with permissions: `kinesis:GetRecords`, `sns:Publish`, `dynamodb:PutItem`
+
+4. **Test with live traffic:**
+   - Run SQLMap attacks (Person 1)
+   - Verify Lambda triggers and classifies correctly
+   - Measure detection latency (target: < 2 seconds)
+
+5. **Correlate with GuardDuty findings** in the AWS Console — document any attacks GuardDuty caught that Lambda missed, and vice versa.
+
+---
+
+## Lambda vs. GuardDuty — Complementary Coverage
+
+| | Lambda | GuardDuty |
+|--|--------|-----------|
+| What it detects | SQLi patterns in HTTP payloads | Infrastructure anomalies and known bad IPs |
+| Data source | WAF logs via Kinesis | CloudTrail, VPC Flow Logs, DNS |
+| Detection speed | < 2 seconds | Minutes |
+| Customisable | Yes (you write the rules) | No (managed by AWS) |
+| Best for | Payload-level detection | Behavioural / infrastructure-level detection |
+
+---
+
+## Report Section Ownership
+
+| Section | Title |
+|---------|-------|
+| Section 3 | System Architecture (with diagrams) |
+| Section 6 | Implementation: Detection Engine (Lambda + GuardDuty) |
+
+Include in your section:
+- Lambda code walkthrough
+- Severity classification matrix
+- Detection rate and false positive rate results
+- GuardDuty findings screenshots
+- Comparison table: Lambda detections vs. GuardDuty findings
+
+---
+
+## Key Outputs / Deliverables
+
+- [ ] GuardDuty enabled and generating findings
+- [ ] Lambda function deployed and connected to Kinesis
+- [ ] Detection rate measured (e.g. X% of payloads detected)
+- [ ] False positive rate measured
+- [ ] Detection latency measured (target < 2s)
+- [ ] GuardDuty findings correlated with Lambda detections
+- [ ] SNS alerts firing correctly on HIGH/CRITICAL events
