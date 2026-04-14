@@ -12,5 +12,5 @@ variable "target_ec2_ip" {
 variable "kinesis_firehose_arn" {
   description = "The ARN of the Kinesis Firehose stream created by Person 4 for WAF logs"
   type        = string
-  default     = "" # Left empty since Person 4 hasn't created it yet
+  default     = "arn:aws:firehose:us-east-2:867490540204:deliverystream/aws-waf-logs-sqli-logs-to-s3"
 }

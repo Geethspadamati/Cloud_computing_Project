@@ -80,7 +80,7 @@ resource "aws_wafv2_web_acl" "sqli_detection_waf" {
   }
 }
 
-# resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
-#   log_destination_configs = [var.kinesis_firehose_arn]
-#   resource_arn            = aws_wafv2_web_acl.sqli_detection_waf.arn
-# }
+resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
+  log_destination_configs = [var.kinesis_firehose_arn]
+  resource_arn            = aws_wafv2_web_acl.sqli_detection_waf.arn
+}
