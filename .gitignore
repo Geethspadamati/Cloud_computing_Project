@@ -4,3 +4,4 @@
 
 # Ignore assignment docs
 tasks/
+node_modules/
