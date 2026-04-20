@@ -168,3 +168,5 @@ resource "aws_cloudwatch_log_subscription_filter" "waf_logs_to_kinesis" {
   destination_arn = aws_kinesis_stream.sqli_waf_logs.arn
   role_arn        = aws_iam_role.cloudwatch_to_kinesis_role.arn
 }
+
+# reviewed
