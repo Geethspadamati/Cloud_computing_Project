@@ -24,7 +24,7 @@ resource "aws_sns_topic_subscription" "person3_email" {
 resource "aws_sns_topic_subscription" "person4_email" {
   topic_arn = aws_sns_topic.sqli_alerts.arn
   protocol  = "email"
-  endpoint  = var.team_email_4
+  endpoint  = mosomo82us@gmail.com
 }
 
 resource "aws_sns_topic_subscription" "person5_email" {

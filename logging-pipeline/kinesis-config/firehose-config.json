@@ -1,0 +1,27 @@
+{
+  "project": "sqli-project",
+  "description": "Kinesis Data Firehose delivery stream for AWS WAF logs to S3",
+  "deliveryStream": {
+    "name": "aws-waf-logs-sqli-logs-to-s3",
+    "displayName": "aws-waf-logs-sqli-logs-to-s3",
+    "source": {
+      "type": "KinesisDataStream",
+      "streamName": "aws-waf-logs-sqli-waf-logs"
+    },
+    "destination": {
+      "type": "S3",
+      "bucketName": "sqli-project-logs-<YOUR-ACCOUNT-ID>",
+      "prefix": "waf-logs/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
+      "errorOutputPrefix": "errors/"
+    },
+    "bufferingHints": {
+      "sizeInMBs": 5,
+      "intervalInSeconds": 300
+    },
+    "compressionFormat": "UNCOMPRESSED",
+    "encryption": {
+      "enabled": true,
+      "type": "SSE-S3"
+    }
+  }
+}

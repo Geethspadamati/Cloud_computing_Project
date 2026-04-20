@@ -1,0 +1,41 @@
+{
+    "widgets": [
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/WAFV2", "AllowedRequests", "WebACL", "sqli-detection-waf", "Region", "us-east-2", "Rule", "ALL" ],
+                    [ ".", "BlockedRequests", ".", ".", ".", ".", ".", "." ],
+                    [ ".", "BlockedRequests", ".", ".", ".", ".", "Rule", "AWSManagedRulesSQLiRuleSetMetric", { "label": "DDoS/Flood Blocks" } ]
+                ],
+                "region": "us-east-2",
+                "stacked": false,
+                "title": "Requests Per Minute",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 0,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "SQLiDetection", "UnionSelectCount" ],
+                    [ ".", "BlockedRequestCount" ],
+                    [ ".", "SleepAttackCount" ],
+                    [ ".", "SchemaProbeCount" ]
+                ],
+                "region": "us-east-2",
+                "stacked": false,
+                "title": "SQLi Detections by Type",
+                "view": "timeSeries"
+            }
+        }
+    ]
+}
