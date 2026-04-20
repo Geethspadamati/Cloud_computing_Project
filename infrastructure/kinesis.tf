@@ -89,3 +89,5 @@ resource "aws_kinesis_firehose_delivery_stream" "sqli_logs_to_s3" {
     }
   }
 }
+
+# reviewed
